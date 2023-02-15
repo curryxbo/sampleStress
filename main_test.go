@@ -116,6 +116,8 @@ func TestBatchTransactions(t *testing.T) {
 	if err != nil {
 		log.Fatal(err)
 	}
+	var sy sync.Mutex
+	var index int
 	receiveAccount := accountInit.Addr
 	for i := 0; i < accountCount; i++ {
 		client, err := ethclient.Dial("http://localhost:8545")
@@ -132,21 +134,25 @@ func TestBatchTransactions(t *testing.T) {
 		txOpt.GasLimit = uint64(21000)
 		txOpt.GasPrice = big.NewInt(1)
 		go func() {
+			nonce, err := client.PendingNonceAt(context.Background(), common.HexToAddress(account.Address.Hex()))
+			if err != nil {
+				s.Done()
+				return
+			}
 			for i := 0; i < 10000; i++ {
-				nonce, err := client.PendingNonceAt(context.Background(), common.HexToAddress(account.Address.Hex()))
-				if err != nil {
-					panic(err)
-				}
 				txOpt.Value = big.NewInt(1)
-				rawTx := types.NewTransaction(nonce, receiveAccount, txOpt.Value, txOpt.GasLimit, txOpt.GasPrice, nil)
+				rawTx := types.NewTransaction(nonce+uint64(i), receiveAccount, txOpt.Value, txOpt.GasLimit, txOpt.GasPrice, nil)
 
 				signedTx, err := txOpt.Signer(types.HomesteadSigner{}, txOpt.From, rawTx)
 				if err != nil {
-					panic(err)
+					continue
 				}
 				err = client.SendTransaction(context.Background(), signedTx)
-				fmt.Println("sendTxHash", signedTx.Hash().String())
-				time.Sleep(100 * time.Millisecond)
+				sy.Lock()
+				fmt.Printf("index:%v,sendTxHash:%v\n", index, signedTx.Hash().String())
+				index++
+				sy.Unlock()
+				//time.Sleep(1000 * time.Millisecond)
 			}
 			s.Done()
 		}()
