@@ -161,7 +161,7 @@ func TestPrintPrKey(t *testing.T) {
 		log.Fatal(err)
 	}
 
-	for i := 0; i < 100; i++ {
+	for i := 0; i < accountCount; i++ {
 		path := hdwallet.MustParseDerivationPath(fmt.Sprintf("m/44'/60'/0'/0/%v", i))
 		account, err := wallet.Derive(path, false)
 		if err != nil {
