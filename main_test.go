@@ -23,7 +23,7 @@ var mnemonic = "pepper hair process town say voyage exhibit over carry property 
 var accountInit, _ = FromHexKey("ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")
 var accountCount = 50 // account and Number of threads
 var txCount = 1000
-var IsSync = false
+var IsSync = true
 
 func FromHexKey(hexkey string) (ExtAcc, error) {
 	key, err := crypto.HexToECDSA(hexkey)
@@ -161,7 +161,7 @@ func TestBatchTransactions(t *testing.T) {
 					fmt.Printf("i:%v,in:%v,sendTxHash:%v\n", i, in, signedTx.Hash().String())
 				}
 
-				time.Sleep(100 * time.Millisecond)
+				time.Sleep(50 * time.Millisecond)
 			}
 			s.Done()
 		}()
@@ -205,7 +205,7 @@ func TestBatchTransactions(t *testing.T) {
 				} else {
 					fmt.Printf("i:%v,in:%v,sendTxHash:%v\n", i, in, signedTx.Hash().String())
 				}
-				time.Sleep(100 * time.Millisecond)
+				time.Sleep(50 * time.Millisecond)
 			}
 			s.Done()
 		}()
