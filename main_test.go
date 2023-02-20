@@ -21,7 +21,8 @@ import (
 
 var mnemonic = "pepper hair process town say voyage exhibit over carry property follow define"
 var accountInit, _ = FromHexKey("ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")
-var accountCount = 10 // account and Number of threads
+var accountCount = 50 // account and Number of threads
+var txCount = 1000
 var IsSync = false
 
 func FromHexKey(hexkey string) (ExtAcc, error) {
@@ -84,7 +85,7 @@ func TestInitAccount(t *testing.T) {
 		}
 		err = client.SendTransaction(context.Background(), signedTx)
 		fmt.Println("sendTxHash", signedTx.Hash().String())
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(500 * time.Millisecond)
 	}
 }
 
@@ -122,7 +123,7 @@ func TestBatchTransactions(t *testing.T) {
 	receiveAccount := accountInit.Addr
 	start := time.Now()
 	for i := 0; i < accountCount/2; i++ {
-		client, err := ethclient.Dial("http://localhost:8545")
+		client, err := ethclient.Dial("http://localhost:8565")
 		if err != nil {
 			panic(err)
 		}
@@ -142,7 +143,7 @@ func TestBatchTransactions(t *testing.T) {
 				s.Done()
 				return
 			}
-			for in := 0; in < 100; in++ {
+			for in := 0; in < txCount; in++ {
 				txOpt.Value = big.NewInt(1)
 				rawTx := types.NewTransaction(nonce+uint64(in), receiveAccount, txOpt.Value, txOpt.GasLimit, txOpt.GasPrice, nil)
 
@@ -160,14 +161,14 @@ func TestBatchTransactions(t *testing.T) {
 					fmt.Printf("i:%v,in:%v,sendTxHash:%v\n", i, in, signedTx.Hash().String())
 				}
 
-				time.Sleep(20 * time.Millisecond)
+				time.Sleep(100 * time.Millisecond)
 			}
 			s.Done()
 		}()
 	}
 
 	for i := accountCount / 2; i < accountCount; i++ {
-		client, err := ethclient.Dial("http://localhost:8555")
+		client, err := ethclient.Dial("http://localhost:8565")
 		if err != nil {
 			panic(err)
 		}
@@ -187,7 +188,7 @@ func TestBatchTransactions(t *testing.T) {
 				s.Done()
 				return
 			}
-			for in := 0; in < 100; in++ {
+			for in := 0; in < txCount; in++ {
 				txOpt.Value = big.NewInt(1)
 				rawTx := types.NewTransaction(nonce+uint64(in), receiveAccount, txOpt.Value, txOpt.GasLimit, txOpt.GasPrice, nil)
 
@@ -204,7 +205,7 @@ func TestBatchTransactions(t *testing.T) {
 				} else {
 					fmt.Printf("i:%v,in:%v,sendTxHash:%v\n", i, in, signedTx.Hash().String())
 				}
-				time.Sleep(20 * time.Millisecond)
+				time.Sleep(100 * time.Millisecond)
 			}
 			s.Done()
 		}()
