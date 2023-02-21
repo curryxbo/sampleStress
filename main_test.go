@@ -213,8 +213,8 @@ func TestBatchTransactions(t *testing.T) {
 	s.Wait()
 	fmt.Println("start:", start)
 	fmt.Println("end:", time.Now())
+	ii := 0
 	for {
-		ii := 0
 		time.Sleep(1 * time.Second)
 		fmt.Println("second:", ii)
 		ii++
