@@ -11,19 +11,19 @@ import (
 	"time"
 
 	"github.com/cosmos/go-bip39"
-	"github.com/mantlenetworkio/mantle/l2geth/accounts/abi/bind"
-	"github.com/mantlenetworkio/mantle/l2geth/common"
-	"github.com/mantlenetworkio/mantle/l2geth/core/types"
-	"github.com/mantlenetworkio/mantle/l2geth/crypto"
-	"github.com/mantlenetworkio/mantle/l2geth/ethclient"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/ethclient"
 	hdwallet "github.com/miguelmota/go-ethereum-hdwallet"
 )
 
 var mnemonic = "pepper hair process town say voyage exhibit over carry property follow define"
 var accountInit, _ = FromHexKey("ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")
-var accountCount = 50 // account and Number of threads
-var txCount = 1000
-var IsSync = true
+var accountCount = 500 // account and Number of threads
+var txCount = 100
+var IsSync = false
 
 func FromHexKey(hexkey string) (ExtAcc, error) {
 	key, err := crypto.HexToECDSA(hexkey)
@@ -46,15 +46,16 @@ type ExtAcc struct {
 }
 
 func TestInitAccount(t *testing.T) {
-	txOpt := bind.NewKeyedTransactor(accountInit.Key)
+	//txOpt := bind.NewKeyedTransactor(accountInit.Key)
+	txOpt, err := bind.NewKeyedTransactorWithChainID(accountInit.Key, big.NewInt(0x385))
 
-	client, err := ethclient.Dial("http://localhost:8545")
+	client, err := ethclient.Dial("http://localhost:9545")
 	if err != nil {
 		panic(err)
 	}
 	//txOpt.Value = big.NewInt(5e18)
 	txOpt.GasLimit = uint64(21000)
-	txOpt.GasPrice = big.NewInt(1)
+	txOpt.GasPrice = big.NewInt(1000000000)
 	seed := bip39.NewSeed(mnemonic, "")
 	wallet, err := hdwallet.NewFromSeed(seed)
 	if err != nil {
@@ -71,7 +72,7 @@ func TestInitAccount(t *testing.T) {
 		receiveAccount := common.HexToAddress(account.Address.Hex())
 		txOpt.Value = sendValue
 		txOpt.GasLimit = uint64(21000)
-		txOpt.GasPrice = big.NewInt(1)
+		txOpt.GasPrice = big.NewInt(1000000000)
 		nonce, err := client.PendingNonceAt(context.Background(), accountInit.Addr)
 		if err != nil {
 			panic(err)
@@ -79,7 +80,8 @@ func TestInitAccount(t *testing.T) {
 		txOpt.Value = sendValue
 		rawTx := types.NewTransaction(nonce, receiveAccount, txOpt.Value, txOpt.GasLimit, txOpt.GasPrice, nil)
 
-		signedTx, err := txOpt.Signer(types.HomesteadSigner{}, txOpt.From, rawTx)
+		//signedTx, err := txOpt.Signer(types.HomesteadSigner{}, txOpt.From, rawTx)
+		signedTx, err := txOpt.Signer(txOpt.From, rawTx)
 		if err != nil {
 			panic(err)
 		}
@@ -90,7 +92,7 @@ func TestInitAccount(t *testing.T) {
 }
 
 func TestQueryAccountsBalance(t *testing.T) {
-	client, err := ethclient.Dial("http://localhost:8545")
+	client, err := ethclient.Dial("http://localhost:9545")
 	if err != nil {
 		panic(err)
 	}
@@ -123,7 +125,7 @@ func TestBatchTransactions(t *testing.T) {
 	receiveAccount := accountInit.Addr
 	start := time.Now()
 	for i := 0; i < accountCount/2; i++ {
-		client, err := ethclient.Dial("http://localhost:8565")
+		client, err := ethclient.Dial("http://localhost:9545")
 		if err != nil {
 			panic(err)
 		}
@@ -133,9 +135,10 @@ func TestBatchTransactions(t *testing.T) {
 			log.Fatal(err)
 		}
 		privKey, _ := wallet.PrivateKey(account)
-		txOpt := bind.NewKeyedTransactor(privKey)
+		//txOpt := bind.NewKeyedTransactor(privKey)
+		txOpt, err := bind.NewKeyedTransactorWithChainID(privKey, big.NewInt(0x385))
 		txOpt.GasLimit = uint64(21000)
-		txOpt.GasPrice = big.NewInt(1)
+		txOpt.GasPrice = big.NewInt(1000000000)
 		go func() {
 			nonce, err := client.PendingNonceAt(context.Background(), common.HexToAddress(account.Address.Hex()))
 			if err != nil {
@@ -147,7 +150,8 @@ func TestBatchTransactions(t *testing.T) {
 				txOpt.Value = big.NewInt(1)
 				rawTx := types.NewTransaction(nonce+uint64(in), receiveAccount, txOpt.Value, txOpt.GasLimit, txOpt.GasPrice, nil)
 
-				signedTx, err := txOpt.Signer(types.HomesteadSigner{}, txOpt.From, rawTx)
+				//signedTx, err := txOpt.Signer(types.HomesteadSigner{}, txOpt.From, rawTx)
+				signedTx, err := txOpt.Signer(txOpt.From, rawTx)
 				if err != nil {
 					continue
 				}
@@ -168,7 +172,7 @@ func TestBatchTransactions(t *testing.T) {
 	}
 
 	for i := accountCount / 2; i < accountCount; i++ {
-		client, err := ethclient.Dial("http://localhost:8565")
+		client, err := ethclient.Dial("http://localhost:9545")
 		if err != nil {
 			panic(err)
 		}
@@ -178,9 +182,10 @@ func TestBatchTransactions(t *testing.T) {
 			log.Fatal(err)
 		}
 		privKey, _ := wallet.PrivateKey(account)
-		txOpt := bind.NewKeyedTransactor(privKey)
+		//txOpt := bind.NewKeyedTransactor(privKey)
+		txOpt, err := bind.NewKeyedTransactorWithChainID(privKey, big.NewInt(0x385))
 		txOpt.GasLimit = uint64(21000)
-		txOpt.GasPrice = big.NewInt(1)
+		txOpt.GasPrice = big.NewInt(1000000000)
 		go func() {
 			nonce, err := client.PendingNonceAt(context.Background(), common.HexToAddress(account.Address.Hex()))
 			if err != nil {
@@ -192,7 +197,8 @@ func TestBatchTransactions(t *testing.T) {
 				txOpt.Value = big.NewInt(1)
 				rawTx := types.NewTransaction(nonce+uint64(in), receiveAccount, txOpt.Value, txOpt.GasLimit, txOpt.GasPrice, nil)
 
-				signedTx, err := txOpt.Signer(types.HomesteadSigner{}, txOpt.From, rawTx)
+				//signedTx, err := txOpt.Signer(types.HomesteadSigner{}, txOpt.From, rawTx)
+				signedTx, err := txOpt.Signer(txOpt.From, rawTx)
 				if err != nil {
 					continue
 				}
