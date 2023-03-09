@@ -11,19 +11,27 @@ import (
 	"time"
 
 	"github.com/cosmos/go-bip39"
-	"github.com/mantlenetworkio/mantle/l2geth/accounts/abi/bind"
-	"github.com/mantlenetworkio/mantle/l2geth/common"
-	"github.com/mantlenetworkio/mantle/l2geth/core/types"
-	"github.com/mantlenetworkio/mantle/l2geth/crypto"
-	"github.com/mantlenetworkio/mantle/l2geth/ethclient"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	//"github.com/mantlenetworkio/mantle/l2geth/common"
+	//"github.com/mantlenetworkio/mantle/l2geth/core/types"
+	//"github.com/mantlenetworkio/mantle/l2geth/crypto"
+	//"github.com/mantlenetworkio/mantle/l2geth/ethclient"
+
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/ethclient"
 	hdwallet "github.com/miguelmota/go-ethereum-hdwallet"
 )
 
 var mnemonic = "pepper hair process town say voyage exhibit over carry property follow define"
-var accountInit, _ = FromHexKey("ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")
-var accountCount = 50 // account and Number of threads
+var accountInit, _ = FromHexKey("bf7604d9d3a1c7748642b1b7b05c2bd219c9faa91458b370f85e5a40f3b03af7")
+
+// bf7604d9d3a1c7748642b1b7b05c2bd219c9faa91458b370f85e5a40f3b03af7  //bedrock
+// ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
+var accountCount = 500 // account and Number of threads
 var txCount = 1000
-var IsSync = true
+var IsSync = false
 
 func FromHexKey(hexkey string) (ExtAcc, error) {
 	key, err := crypto.HexToECDSA(hexkey)
@@ -48,7 +56,7 @@ type ExtAcc struct {
 func TestInitAccount(t *testing.T) {
 	txOpt := bind.NewKeyedTransactor(accountInit.Key)
 
-	client, err := ethclient.Dial("http://localhost:8545")
+	client, err := ethclient.Dial("http://localhost:9545")
 	if err != nil {
 		panic(err)
 	}
@@ -77,12 +85,35 @@ func TestInitAccount(t *testing.T) {
 			panic(err)
 		}
 		txOpt.Value = sendValue
-		rawTx := types.NewTransaction(nonce, receiveAccount, txOpt.Value, txOpt.GasLimit, txOpt.GasPrice, nil)
+		// 创建交易对象
+		//tx := types.NewTx(&types.DynamicFeeTx{
+		//	ChainID:   big.NewInt(905), // 主网的 Chain ID 为 1
+		//	Nonce:     nonce,           // 发送方账户的交易 nonce
+		//	GasTipCap: big.NewInt(10),  // 打包人希望获得的小费，单位为 wei
+		//	//MaxFeePerGas: big.NewInt(100000000000), // gas 费用上限，单位为 wei
+		//	GasFeeCap: big.NewInt(50000000000), // 基础 gas 费用，单位为 wei
+		//	To:        &receiveAccount,
+		//	Value:     txOpt.Value, // 要发送的以太币数量，单位为 wei
+		//	Data:      []byte{},
+		//})
+		gasPrice, _ := client.SuggestGasPrice(context.Background())
 
-		signedTx, err := txOpt.Signer(types.HomesteadSigner{}, txOpt.From, rawTx)
-		if err != nil {
-			panic(err)
+		baseTx := &types.LegacyTx{
+			To:       &receiveAccount,
+			Nonce:    nonce,
+			GasPrice: gasPrice,
+			Gas:      50000000000,
+			Value:    txOpt.Value,
+			Data:     nil,
 		}
+		tx := types.NewTx(baseTx)
+
+		// 使用私钥对交易进行签名
+		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(tx.ChainId()), accountInit.Key)
+		if err != nil {
+			log.Fatal(err)
+		}
+
 		err = client.SendTransaction(context.Background(), signedTx)
 		fmt.Println("sendTxHash", signedTx.Hash().String())
 		time.Sleep(500 * time.Millisecond)
@@ -90,7 +121,7 @@ func TestInitAccount(t *testing.T) {
 }
 
 func TestQueryAccountsBalance(t *testing.T) {
-	client, err := ethclient.Dial("http://localhost:8545")
+	client, err := ethclient.Dial("http://localhost:9545")
 	if err != nil {
 		panic(err)
 	}
@@ -123,7 +154,7 @@ func TestBatchTransactions(t *testing.T) {
 	receiveAccount := accountInit.Addr
 	start := time.Now()
 	for i := 0; i < accountCount/2; i++ {
-		client, err := ethclient.Dial("http://localhost:8565")
+		client, err := ethclient.Dial("http://localhost:9545")
 		if err != nil {
 			panic(err)
 		}
@@ -145,12 +176,36 @@ func TestBatchTransactions(t *testing.T) {
 			}
 			for in := 0; in < txCount; in++ {
 				txOpt.Value = big.NewInt(1)
-				rawTx := types.NewTransaction(nonce+uint64(in), receiveAccount, txOpt.Value, txOpt.GasLimit, txOpt.GasPrice, nil)
+				// 创建交易对象
+				//tx := types.NewTx(&types.DynamicFeeTx{
+				//	ChainID:   big.NewInt(1),      // 主网的 Chain ID 为 1
+				//	Nonce:     nonce + uint64(in), // 发送方账户的交易 nonce
+				//	GasTipCap: big.NewInt(10),     // 打包人希望获得的小费，单位为 wei
+				//	//MaxFeePerGas: big.NewInt(100000000000), // gas 费用上限，单位为 wei
+				//	GasFeeCap: big.NewInt(50000000000), // 基础 gas 费用，单位为 wei
+				//	To:        &receiveAccount,
+				//	Value:     txOpt.Value, // 要发送的以太币数量，单位为 wei
+				//	Data:      []byte{},
+				//})
 
-				signedTx, err := txOpt.Signer(types.HomesteadSigner{}, txOpt.From, rawTx)
-				if err != nil {
-					continue
+				gasPrice, _ := client.SuggestGasPrice(context.Background())
+
+				baseTx := &types.LegacyTx{
+					To:       &receiveAccount,
+					Nonce:    nonce,
+					GasPrice: gasPrice,
+					Gas:      50000000000,
+					Value:    txOpt.Value,
+					Data:     nil,
 				}
+				tx := types.NewTx(baseTx)
+
+				// 使用私钥对交易进行签名
+				signedTx, err := types.SignTx(tx, types.NewEIP155Signer(tx.ChainId()), privKey)
+				if err != nil {
+					log.Fatal(err)
+				}
+
 				err = client.SendTransaction(context.Background(), signedTx)
 				if IsSync {
 					sy.Lock()
@@ -168,7 +223,7 @@ func TestBatchTransactions(t *testing.T) {
 	}
 
 	for i := accountCount / 2; i < accountCount; i++ {
-		client, err := ethclient.Dial("http://localhost:8565")
+		client, err := ethclient.Dial("http://localhost:9545")
 		if err != nil {
 			panic(err)
 		}
@@ -190,11 +245,34 @@ func TestBatchTransactions(t *testing.T) {
 			}
 			for in := 0; in < txCount; in++ {
 				txOpt.Value = big.NewInt(1)
-				rawTx := types.NewTransaction(nonce+uint64(in), receiveAccount, txOpt.Value, txOpt.GasLimit, txOpt.GasPrice, nil)
+				// 创建交易对象
+				//tx := types.NewTx(&types.DynamicFeeTx{
+				//	ChainID:   big.NewInt(1),      // 主网的 Chain ID 为 1
+				//	Nonce:     nonce + uint64(in), // 发送方账户的交易 nonce
+				//	GasTipCap: big.NewInt(10),     // 打包人希望获得的小费，单位为 wei
+				//	//MaxFeePerGas: big.NewInt(100000000000), // gas 费用上限，单位为 wei
+				//	GasFeeCap: big.NewInt(50000000000), // 基础 gas 费用，单位为 wei
+				//	To:        &receiveAccount,
+				//	Value:     txOpt.Value, // 要发送的以太币数量，单位为 wei
+				//	Data:      []byte{},
+				//})
 
-				signedTx, err := txOpt.Signer(types.HomesteadSigner{}, txOpt.From, rawTx)
+				gasPrice, _ := client.SuggestGasPrice(context.Background())
+
+				baseTx := &types.LegacyTx{
+					To:       &receiveAccount,
+					Nonce:    nonce,
+					GasPrice: gasPrice,
+					Gas:      50000000000,
+					Value:    txOpt.Value,
+					Data:     nil,
+				}
+				tx := types.NewTx(baseTx)
+
+				// 使用私钥对交易进行签名
+				signedTx, err := types.SignTx(tx, types.NewEIP155Signer(tx.ChainId()), privKey)
 				if err != nil {
-					continue
+					log.Fatal(err)
 				}
 				err = client.SendTransaction(context.Background(), signedTx)
 				if IsSync {
