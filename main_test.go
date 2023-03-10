@@ -21,8 +21,8 @@ import (
 
 var mnemonic = "pepper hair process town say voyage exhibit over carry property follow define"
 var accountInit, _ = FromHexKey("ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")
-var accountCount = 500 // account and Number of threads
-var txCount = 100
+var accountCount = 5000 // account and Number of threads
+var txCount = 2
 var IsSync = false
 
 func FromHexKey(hexkey string) (ExtAcc, error) {
@@ -63,7 +63,9 @@ func TestInitAccount(t *testing.T) {
 	}
 	balance, _ := client.BalanceAt(context.Background(), accountInit.Addr, nil)
 	sendValue := balance.Div(balance, big.NewInt(int64(accountCount*2)))
+	//nonce, err := client.PendingNonceAt(context.Background(), accountInit.Addr)
 	for i := 0; i < accountCount; i++ {
+		nonce, err := client.PendingNonceAt(context.Background(), accountInit.Addr)
 		path := hdwallet.MustParseDerivationPath(fmt.Sprintf("m/44'/60'/0'/0/%v", i))
 		account, err := wallet.Derive(path, false)
 		if err != nil {
@@ -73,10 +75,6 @@ func TestInitAccount(t *testing.T) {
 		txOpt.Value = sendValue
 		txOpt.GasLimit = uint64(21000)
 		txOpt.GasPrice = big.NewInt(1000000000)
-		nonce, err := client.PendingNonceAt(context.Background(), accountInit.Addr)
-		if err != nil {
-			panic(err)
-		}
 		txOpt.Value = sendValue
 		rawTx := types.NewTransaction(nonce, receiveAccount, txOpt.Value, txOpt.GasLimit, txOpt.GasPrice, nil)
 
@@ -85,10 +83,30 @@ func TestInitAccount(t *testing.T) {
 		if err != nil {
 			panic(err)
 		}
+		//go func() {
 		err = client.SendTransaction(context.Background(), signedTx)
+		//}()
 		fmt.Println("sendTxHash", signedTx.Hash().String())
-		time.Sleep(500 * time.Millisecond)
+		time.Sleep(50 * time.Millisecond)
 	}
+}
+
+func TestQueryBlockTxLen(t *testing.T) {
+
+	client, err := ethclient.Dial("http://localhost:9545")
+	if err != nil {
+		panic(err)
+	}
+	for i := 24583; i < 24600; i++ {
+		block, err := client.BlockByNumber(context.Background(), big.NewInt(int64(i)+1))
+		if err != nil {
+			fmt.Println(err)
+		}
+		fmt.Println("tx length:", len(block.Transactions()))
+		fmt.Println("                   block time:", block.Time())
+		fmt.Println("                   block number", block.Number().Uint64())
+	}
+
 }
 
 func TestQueryAccountsBalance(t *testing.T) {
@@ -140,15 +158,15 @@ func TestBatchTransactions(t *testing.T) {
 		txOpt.GasLimit = uint64(21000)
 		txOpt.GasPrice = big.NewInt(1000000000)
 		go func() {
-			nonce, err := client.PendingNonceAt(context.Background(), common.HexToAddress(account.Address.Hex()))
-			if err != nil {
-				fmt.Printf("PendingNonceAt error:%+v\n", err)
-				s.Done()
-				return
-			}
 			for in := 0; in < txCount; in++ {
 				txOpt.Value = big.NewInt(1)
-				rawTx := types.NewTransaction(nonce+uint64(in), receiveAccount, txOpt.Value, txOpt.GasLimit, txOpt.GasPrice, nil)
+				nonce, err := client.PendingNonceAt(context.Background(), common.HexToAddress(account.Address.Hex()))
+				if err != nil {
+					fmt.Printf("PendingNonceAt error:%+v\n", err)
+					s.Done()
+					return
+				}
+				rawTx := types.NewTransaction(nonce, receiveAccount, txOpt.Value, txOpt.GasLimit, txOpt.GasPrice, nil)
 
 				//signedTx, err := txOpt.Signer(types.HomesteadSigner{}, txOpt.From, rawTx)
 				signedTx, err := txOpt.Signer(txOpt.From, rawTx)
@@ -165,7 +183,7 @@ func TestBatchTransactions(t *testing.T) {
 					fmt.Printf("i:%v,in:%v,sendTxHash:%v\n", i, in, signedTx.Hash().String())
 				}
 
-				time.Sleep(50 * time.Millisecond)
+				time.Sleep(100 * time.Nanosecond)
 			}
 			s.Done()
 		}()
@@ -187,15 +205,15 @@ func TestBatchTransactions(t *testing.T) {
 		txOpt.GasLimit = uint64(21000)
 		txOpt.GasPrice = big.NewInt(1000000000)
 		go func() {
-			nonce, err := client.PendingNonceAt(context.Background(), common.HexToAddress(account.Address.Hex()))
-			if err != nil {
-				fmt.Printf("PendingNonceAt error:%+v\n", err)
-				s.Done()
-				return
-			}
 			for in := 0; in < txCount; in++ {
 				txOpt.Value = big.NewInt(1)
-				rawTx := types.NewTransaction(nonce+uint64(in), receiveAccount, txOpt.Value, txOpt.GasLimit, txOpt.GasPrice, nil)
+				nonce, err := client.PendingNonceAt(context.Background(), common.HexToAddress(account.Address.Hex()))
+				if err != nil {
+					fmt.Printf("PendingNonceAt error:%+v\n", err)
+					s.Done()
+					return
+				}
+				rawTx := types.NewTransaction(nonce, receiveAccount, txOpt.Value, txOpt.GasLimit, txOpt.GasPrice, nil)
 
 				//signedTx, err := txOpt.Signer(types.HomesteadSigner{}, txOpt.From, rawTx)
 				signedTx, err := txOpt.Signer(txOpt.From, rawTx)
@@ -211,7 +229,7 @@ func TestBatchTransactions(t *testing.T) {
 				} else {
 					fmt.Printf("i:%v,in:%v,sendTxHash:%v\n", i, in, signedTx.Hash().String())
 				}
-				time.Sleep(50 * time.Millisecond)
+				time.Sleep(100 * time.Nanosecond)
 			}
 			s.Done()
 		}()
@@ -219,12 +237,6 @@ func TestBatchTransactions(t *testing.T) {
 	s.Wait()
 	fmt.Println("start:", start)
 	fmt.Println("end:", time.Now())
-	ii := 0
-	for {
-		time.Sleep(1 * time.Second)
-		fmt.Println("second:", ii)
-		ii++
-	}
 }
 
 func TestPrintPrKey(t *testing.T) {
